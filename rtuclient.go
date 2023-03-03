@@ -45,10 +45,11 @@ type rtuPackager struct {
 }
 
 // Encode encodes PDU in a RTU frame:
-//  Slave Address   : 1 byte
-//  Function        : 1 byte
-//  Data            : 0 up to 252 bytes
-//  CRC             : 2 byte
+//
+//	Slave Address   : 1 byte
+//	Function        : 1 byte
+//	Data            : 0 up to 252 bytes
+//	CRC             : 2 byte
 func (mb *rtuPackager) Encode(pdu *ProtocolDataUnit) (adu []byte, err error) {
 	length := len(pdu.Data) + 4
 	if length > rtuMaxSize {
@@ -120,15 +121,18 @@ func (mb *rtuSerialTransporter) Send(aduRequest []byte) (aduResponse []byte, err
 	mb.serialPort.startCloseTimer()
 
 	// Send the request
-	mb.serialPort.logf("modbus: sending % x\n", aduRequest)
+	//mb.serialPort.logf("modbus: sending % x\n", aduRequest)
+	//time.Sleep(10 * time.Nanosecond)
 	if _, err = mb.port.Write(aduRequest); err != nil {
 		return
 	}
+	mb.serialPort.logf("modbus: 发送完成 % x (%v)", aduRequest, time.Now().Sub(mb.serialPort.lastActivity))
 	function := aduRequest[1]
 	functionFail := aduRequest[1] & 0x80
 	bytesToRead := calculateResponseLength(aduRequest)
 	time.Sleep(mb.calculateDelay(len(aduRequest) + bytesToRead))
 
+	start := time.Now()
 	var n int
 	var n1 int
 	var data [rtuMaxSize]byte
@@ -161,7 +165,8 @@ func (mb *rtuSerialTransporter) Send(aduRequest []byte) (aduResponse []byte, err
 		return
 	}
 	aduResponse = data[:n]
-	mb.serialPort.logf("modbus: received % x\n", aduResponse)
+	mb.serialPort.logf("modbus: 接收完成 % x (%v)", aduResponse, time.Now().Sub(start))
+	//mb.serialPort.logf("modbus: received % x\n", aduResponse)
 	return
 }
 

@@ -47,12 +47,13 @@ type asciiPackager struct {
 }
 
 // Encode encodes PDU in a ASCII frame:
-//  Start           : 1 char
-//  Address         : 2 chars
-//  Function        : 2 chars
-//  Data            : 0 up to 2x252 chars
-//  LRC             : 2 chars
-//  End             : 2 chars
+//
+//	Start           : 1 char
+//	Address         : 2 chars
+//	Function        : 2 chars
+//	Data            : 0 up to 2x252 chars
+//	LRC             : 2 chars
+//	End             : 2 chars
 func (mb *asciiPackager) Encode(pdu *ProtocolDataUnit) (adu []byte, err error) {
 	var buf bytes.Buffer
 
@@ -173,14 +174,16 @@ func (mb *asciiSerialTransporter) Send(aduRequest []byte) (aduResponse []byte, e
 	mb.serialPort.startCloseTimer()
 
 	// Send the request
-	mb.serialPort.logf("modbus: sending %q\n", aduRequest)
+	//mb.serialPort.logf("modbus: 发送中 %q\n", aduRequest)
 	if _, err = mb.port.Write(aduRequest); err != nil {
 		return
 	}
+	mb.serialPort.logf("modbus: 发送完成 %q (%s)\n", aduRequest, time.Now().Sub(mb.serialPort.lastActivity))
 	// Get the response
 	var n int
 	var data [asciiMaxSize]byte
 	length := 0
+	start := time.Now()
 	for {
 		if n, err = mb.port.Read(data[length:]); err != nil {
 			return
@@ -197,7 +200,7 @@ func (mb *asciiSerialTransporter) Send(aduRequest []byte) (aduResponse []byte, e
 		}
 	}
 	aduResponse = data[:length]
-	mb.serialPort.logf("modbus: received %q\n", aduResponse)
+	mb.serialPort.logf("modbus: 接收完成 %q (%s)\n", aduResponse, time.Now().Sub(start))
 	return
 }
 

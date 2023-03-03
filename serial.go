@@ -5,8 +5,8 @@
 package modbus
 
 import (
+	"fmt"
 	"io"
-	"log"
 	"sync"
 	"time"
 
@@ -24,7 +24,8 @@ type serialPort struct {
 	// Serial port configuration.
 	serial.Config
 
-	Logger      *log.Logger
+	//Logger      *log.Logger
+	Logf        func(format string, args ...interface{})
 	IdleTimeout time.Duration
 
 	mu sync.Mutex
@@ -70,8 +71,9 @@ func (mb *serialPort) close() (err error) {
 }
 
 func (mb *serialPort) logf(format string, v ...interface{}) {
-	if mb.Logger != nil {
-		mb.Logger.Printf(format, v...)
+	if mb.Logf != nil {
+		mb.Logf(fmt.Sprintf(format, v...))
+		//mb.Logger.Printf(format, v...)
 	}
 }
 
