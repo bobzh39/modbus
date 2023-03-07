@@ -24,6 +24,10 @@ type RTUClientHandler struct {
 	rtuSerialTransporter
 }
 
+func (mb *RTUClientHandler) SetHook(h Hook) {
+	mb.rtuSerialTransporter.SetHook(h)
+}
+
 // NewRTUClientHandler allocates and initializes a RTUClientHandler.
 func NewRTUClientHandler(address string) *RTUClientHandler {
 	handler := &RTUClientHandler{}
@@ -109,6 +113,19 @@ func (mb *rtuPackager) Decode(adu []byte) (pdu *ProtocolDataUnit, err error) {
 // rtuSerialTransporter implements Transporter interface.
 type rtuSerialTransporter struct {
 	serialPort
+	Hook
+}
+
+func (mb *rtuSerialTransporter) SetHook(h Hook) {
+	mb.Hook = h
+}
+
+func (mb *rtuSerialTransporter) BeforeSend(ctx *HookContext) {
+	mb.serialPort.logf("modbus: 发送完成 % x (%v)", ctx.Data, ctx.Dur)
+}
+
+func (mb *rtuSerialTransporter) AfterSend(ctx *HookContext) {
+	mb.serialPort.logf("modbus: 接收完成 % x (%v)", ctx.Data, ctx.Dur)
 }
 
 func (mb *rtuSerialTransporter) Send(aduRequest []byte) (aduResponse []byte, err error) {
@@ -126,7 +143,11 @@ func (mb *rtuSerialTransporter) Send(aduRequest []byte) (aduResponse []byte, err
 	if _, err = mb.port.Write(aduRequest); err != nil {
 		return
 	}
-	mb.serialPort.logf("modbus: 发送完成 % x (%v)", aduRequest, time.Now().Sub(mb.serialPort.lastActivity))
+	mb.Hook.BeforeSend(&HookContext{
+		Data: aduRequest,
+		Dur:  time.Now().Sub(mb.serialPort.lastActivity),
+		Time: mb.serialPort.lastActivity,
+	})
 	function := aduRequest[1]
 	functionFail := aduRequest[1] & 0x80
 	bytesToRead := calculateResponseLength(aduRequest)
@@ -165,7 +186,11 @@ func (mb *rtuSerialTransporter) Send(aduRequest []byte) (aduResponse []byte, err
 		return
 	}
 	aduResponse = data[:n]
-	mb.serialPort.logf("modbus: 接收完成 % x (%v)", aduResponse, time.Now().Sub(start))
+	mb.Hook.AfterSend(&HookContext{
+		Data: aduResponse,
+		Dur:  time.Now().Sub(start),
+		Time: start,
+	})
 	//mb.serialPort.logf("modbus: received % x\n", aduResponse)
 	return
 }

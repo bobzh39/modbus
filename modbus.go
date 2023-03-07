@@ -9,6 +9,7 @@ package modbus
 
 import (
 	"fmt"
+	"time"
 )
 
 const (
@@ -80,6 +81,12 @@ type ProtocolDataUnit struct {
 	Data         []byte
 }
 
+type HookContext struct {
+	Data []byte
+	Dur  time.Duration
+	Time time.Time
+}
+
 // Packager specifies the communication layer.
 type Packager interface {
 	Encode(pdu *ProtocolDataUnit) (adu []byte, err error)
@@ -90,4 +97,9 @@ type Packager interface {
 // Transporter specifies the transport layer.
 type Transporter interface {
 	Send(aduRequest []byte) (aduResponse []byte, err error)
+}
+
+type Hook interface {
+	BeforeSend(*HookContext)
+	AfterSend(*HookContext)
 }
