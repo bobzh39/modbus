@@ -24,8 +24,8 @@ type RTUClientHandler struct {
 	rtuSerialTransporter
 }
 
-func (mb *RTUClientHandler) SetHook(h Hook) {
-	mb.rtuSerialTransporter.SetHook(h)
+func (mb *RTUClientHandler) AddHook(h Hook) {
+	mb.rtuSerialTransporter.AddHook(h)
 }
 
 // NewRTUClientHandler allocates and initializes a RTUClientHandler.
@@ -34,6 +34,7 @@ func NewRTUClientHandler(address string) *RTUClientHandler {
 	handler.Address = address
 	handler.Timeout = serialTimeout
 	handler.IdleTimeout = serialIdleTimeout
+	handler.rtuSerialTransporter.AddHook(&handler.rtuSerialTransporter)
 	return handler
 }
 
@@ -113,11 +114,11 @@ func (mb *rtuPackager) Decode(adu []byte) (pdu *ProtocolDataUnit, err error) {
 // rtuSerialTransporter implements Transporter interface.
 type rtuSerialTransporter struct {
 	serialPort
-	Hook
+	Hooks []Hook
 }
 
-func (mb *rtuSerialTransporter) SetHook(h Hook) {
-	mb.Hook = h
+func (mb *rtuSerialTransporter) AddHook(h Hook) {
+	mb.Hooks = append(mb.Hooks, h)
 }
 
 func (mb *rtuSerialTransporter) BeforeSend(ctx *HookContext) {
@@ -143,11 +144,14 @@ func (mb *rtuSerialTransporter) Send(aduRequest []byte) (aduResponse []byte, err
 	if _, err = mb.port.Write(aduRequest); err != nil {
 		return
 	}
-	mb.Hook.BeforeSend(&HookContext{
-		Data: aduRequest,
-		Dur:  time.Now().Sub(mb.serialPort.lastActivity),
-		Time: mb.serialPort.lastActivity,
-	})
+	for _, h := range mb.Hooks {
+		h.BeforeSend(&HookContext{
+			Data: aduRequest,
+			Dur:  time.Now().Sub(mb.serialPort.lastActivity),
+			Time: mb.serialPort.lastActivity,
+		})
+	}
+
 	function := aduRequest[1]
 	functionFail := aduRequest[1] & 0x80
 	bytesToRead := calculateResponseLength(aduRequest)
@@ -186,11 +190,14 @@ func (mb *rtuSerialTransporter) Send(aduRequest []byte) (aduResponse []byte, err
 		return
 	}
 	aduResponse = data[:n]
-	mb.Hook.AfterSend(&HookContext{
-		Data: aduResponse,
-		Dur:  time.Now().Sub(start),
-		Time: start,
-	})
+
+	for _, h := range mb.Hooks {
+		h.AfterSend(&HookContext{
+			Data: aduResponse,
+			Dur:  time.Now().Sub(start),
+			Time: start,
+		})
+	}
 	//mb.serialPort.logf("modbus: received % x\n", aduResponse)
 	return
 }
